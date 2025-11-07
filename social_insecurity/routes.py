@@ -50,13 +50,13 @@ def index():
                     flash("Account locked due to repeated failed attempts, try again later", category="warning")
                     return redirect(url_for("index"))
                 
-        
+            # Failed attempt
             if not check_password_hash(user["password"], login_form.password.data):
                 max_attempts = app.config.get("LOGIN_ALLOWED_ATTEMPTS")
                 lock_seconds = app.config.get("LOGIN_LOCKOUT_TIMER")
                 current_attempts = user["failed_attempts"]
                 current_attempts += 1
-                if current_attempts >= max_attempts:
+                if current_attempts >= max_attempts: # Lockout occurs
                     lock_until_dt = datetime.now() + timedelta(seconds=lock_seconds)
                     lock_until_str = lock_until_dt.isoformat()
                     update_lock = "UPDATE Users SET failed_attempts = ?, locked_until = ? WHERE username = ?"
