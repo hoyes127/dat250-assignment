@@ -22,3 +22,7 @@ class Config:
     UPLOADS_FOLDER_PATH = "uploads"  # Path relative to the Flask instance folder
     ALLOWED_EXTENSIONS = {}  # TODO: Might use this at some point, probably don't want people to upload any file type
     WTF_CSRF_ENABLED = False  # TODO: I should probably implement this wtforms feature, but it's not a priority
+
+    # Brute force config
+    LOGIN_ALLOWED_ATTEMPTS = 5
+    LOGIN_LOCKOUT_TIMER = 300

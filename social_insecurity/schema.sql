@@ -8,6 +8,8 @@ CREATE TABLE [Users] (
   first_name VARCHAR,
   last_name VARCHAR,
   [password] VARCHAR,
+  failed_attempts INTEGER DEFAULT 0,
+  locked_until TEXT DEFAULT NULL,
   education VARCHAR DEFAULT 'Unknown',
   employment VARCHAR DEFAULT 'Unknown',
   music VARCHAR DEFAULT 'Unknown',

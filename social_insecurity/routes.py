@@ -11,6 +11,8 @@ from flask import flash, redirect, render_template, send_from_directory, url_for
 
 from social_insecurity import sqlite
 from social_insecurity.forms import CommentsForm, FriendsForm, IndexForm, PostForm, ProfileForm
+from werkzeug.security import generate_password_hash, check_password_hash
+from datetime import datetime, timedelta
 
 
 @app.route("/", methods=["GET", "POST"])
@@ -31,23 +33,61 @@ def index():
         get_user = f"""
             SELECT *
             FROM Users
-            WHERE username = '{login_form.username.data}';
+            WHERE username = ?;
             """
-        user = sqlite.query(get_user, one=True)
+        user = sqlite.query(get_user, login_form.username.data, one=True)
 
         if user is None:
-            flash("Sorry, this user does not exist!", category="warning")
-        elif user["password"] != login_form.password.data:
-            flash("Sorry, wrong password!", category="warning")
-        elif user["password"] == login_form.password.data:
-            return redirect(url_for("stream", username=login_form.username.data))
+            flash("Sorry, username or password is wrong", category="warning")
+        else:
+            # We check if the user is locked out
+            if user["locked_until"]:
+                try:
+                    locked_dt = datetime.fromisoformat(user["locked_until"])
+                except Exception:
+                    locked_dt = None
+                if locked_dt and locked_dt > datetime.now():
+                    flash("Account locked due to repeated failed attempts, try again later", category="warning")
+                    return redirect(url_for("index"))
+                
+        
+            if not check_password_hash(user["password"], login_form.password.data):
+                max_attempts = app.config.get("LOGIN_ALLOWED_ATTEMPTS", 5)
+                lock_seconds = app.config.get("LOGIN_LOCKOUT_TIMER", 300)
+                current_attempts = user["failed_attempts"]
+                current_attempts += 1
+                if current_attempts >= max_attempts:
+                    lock_until_dt = datetime.now() + timedelta(seconds=lock_seconds)
+                    lock_until_str = lock_until_dt.isoformat()
+                    update_lock = "UPDATE Users SET failed_attempts = ?, locked_until = ? WHERE username = ?"
+                    sqlite.query(update_lock, current_attempts, lock_until_str, user["username"], one=True)
+                    flash("Account locked due to repeated failed attempts, try again later", category="warning")
+                else:
+                    update_lock = "UPDATE Users SET failed_attempts = ? WHERE username = ?"
+                    sqlite.query(update_lock, current_attempts, user["username"], one=True)
+                    flash("Sorry, username or password is wrong", category="warning")
+                
+            else:
+                reset_lock = "UPDATE Users SET failed_attempts = 0, locked_until = NULL WHERE username = ?"
+                sqlite.query(reset_lock, user["username"], one=True)
+                return redirect(url_for("stream", username=login_form.username.data))
 
     elif register_form.is_submitted() and register_form.submit.data:
+        check_user_q = "SELECT id FROM Users WHERE Username = ?"
+        existing = sqlite.query(check_user_q, register_form.username.data, one=True)
+        if existing:
+            flash("Username is taken", category="warning")
+            return redirect(url_for("index"))
+        if register_form.confirm_password.data != register_form.password.data:
+            flash("Passwords do not match", category="warning")
+            return redirect(url_for("index"))
+        
+        hashed = generate_password_hash(register_form.password.data)
         insert_user = f"""
             INSERT INTO Users (username, first_name, last_name, password)
-            VALUES ('{register_form.username.data}', '{register_form.first_name.data}', '{register_form.last_name.data}', '{register_form.password.data}');
+            VALUES (?, ?, ?, ?);
             """
-        sqlite.query(insert_user)
+        sqlite.query(insert_user, register_form.username.data, register_form.first_name.data, register_form.last_name.data, hashed)
         flash("User successfully created!", category="success")
         return redirect(url_for("index"))
 
