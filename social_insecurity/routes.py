@@ -52,8 +52,8 @@ def index():
                 
         
             if not check_password_hash(user["password"], login_form.password.data):
-                max_attempts = app.config.get("LOGIN_ALLOWED_ATTEMPTS", 5)
-                lock_seconds = app.config.get("LOGIN_LOCKOUT_TIMER", 300)
+                max_attempts = app.config.get("LOGIN_ALLOWED_ATTEMPTS")
+                lock_seconds = app.config.get("LOGIN_LOCKOUT_TIMER")
                 current_attempts = user["failed_attempts"]
                 current_attempts += 1
                 if current_attempts >= max_attempts:
